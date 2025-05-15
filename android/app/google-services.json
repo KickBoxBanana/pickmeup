@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "905923441213",
+    "project_id": "pick-me-up-db",
+    "storage_bucket": "pick-me-up-db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:905923441213:android:e4892564f4556a1471f054",
+        "android_client_info": {
+          "package_name": "com.example.pick_me_up"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAT8EJCV3EH6LxM0TwJrArzWEOjXm-OIlI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
