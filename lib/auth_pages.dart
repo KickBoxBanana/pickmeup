@@ -7,7 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'main.dart';
 
-
+//Handles Firebase Auth Operations
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -20,8 +20,7 @@ class AuthService {
         password: password,
       );
 
-      // Optionally, you can check verification here if you want to prevent
-      // unverified users from signing in at all
+      // Checks whether user has email verified, before signing in
       if (!userCredential.user!.emailVerified) {
         await _auth.signOut();
         throw FirebaseAuthException(
@@ -53,15 +52,14 @@ class AuthService {
       // Send email verification
       await result.user!.sendEmailVerification();
 
-      final classDoc = await FirebaseFirestore.instance.collection('classes').doc('def_class').get();
-      final skillsMap = classDoc.data()!['skills'] as List<dynamic>;
-
       // Add user details to Firestore
       await _firestore.collection('users').doc(result.user!.uid).set({
         'email': email,
         'name': name,
         'username': username,
         'createdAt': FieldValue.serverTimestamp(),
+
+        //Sets users' default stats
         'userLevel': 1,
         'gold': 0,
         'gems': 0,
@@ -74,6 +72,7 @@ class AuthService {
         'emailVerified': false, // Track verification status
       });
 
+      //Sets default base stats
       await _firestore.collection('users').doc(result.user!.uid).collection('stats').doc('base').set({
         'intelligence':1,
         'strength':1,
@@ -81,11 +80,12 @@ class AuthService {
         'vitality':1,
       });
 
+      //Sets default battle stats
       await _firestore.collection('users').doc(result.user!.uid).collection('stats').doc('battle').set({
-        'phyatk':10,
-        'phydef':10,
-        'magatk':10,
-        'magdef':10,
+        'phyatk':5,
+        'phydef':5,
+        'magatk':5,
+        'magdef':5,
       });
 
 
@@ -212,6 +212,7 @@ class _LoginPageState extends State<LoginPage> {
                       labelText: 'Password',
                       prefixIcon: Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
+                        // Hiding/Showing Password
                         icon: Icon(
                           _obscurePassword ? Icons.visibility : Icons.visibility_off,
                         ),
@@ -294,6 +295,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  // Login validation
   void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -306,7 +308,7 @@ class _LoginPageState extends State<LoginPage> {
         // Navigate to home screen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()),
+          MaterialPageRoute(builder: (context) => NavigationPage()),
         );
       } on FirebaseAuthException catch (e) {
         print('Firebase Auth Error Code: ${e.code}');
@@ -336,7 +338,7 @@ class _LoginPageState extends State<LoginPage> {
           _errorMessage = message;
         });
 
-        // Set a timer to clear the error message after 5 seconds
+        // Clears the error message after 5 seconds
         Timer(Duration(seconds: 5), () {
           if (mounted) {  // Check if widget is still mounted
             setState(() {

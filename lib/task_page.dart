@@ -10,44 +10,7 @@ import 'custom_widgets.dart';
 import 'game_mechanics.dart';
 import 'task_dialog_service.dart';
 
-
-void showLevelUpDialog(BuildContext context, int newLevel) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('Level Up!'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.arrow_upward, color: Colors.amber, size: 50),
-          SizedBox(height: 16),
-          Text(
-            'Congratulations!',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'You have reached level $newLevel',
-            style: TextStyle(fontSize: 16),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Keep up the good work!',
-            style: TextStyle(fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('OK'),
-        ),
-      ],
-    ),
-  );
-}
-
-// Class to represent task rewards
+// Represents task rewards
 class TaskReward {
   final int xp;
   final int gold;
@@ -60,6 +23,7 @@ class TaskReward {
   });
 }
 
+// Handles Interval Task Refreshes
 class TaskResetService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -141,10 +105,11 @@ class TaskResetService {
         final DateTime now = DateTime.now();
         
         // If current time is before today's reset time, use today's reset time
-        // Otherwise, use tomorrow's reset time
         if (now.isBefore(todayReset)) {
           debugPrint("Current time is before reset time, using today's reset: $todayReset");
           return todayReset;
+
+          // Otherwise, use tomorrow's reset time
         } else {
           final DateTime tomorrowReset = todayReset.add(Duration(days: 1));
           debugPrint("Current time is after reset time, using tomorrow's reset: $tomorrowReset");
@@ -339,6 +304,7 @@ class TaskResetService {
   }
 }
 
+// Handles task addition/deletion/editing, completion, and filtering logic
 class TaskProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -379,12 +345,7 @@ class TaskProvider with ChangeNotifier {
   String? get error => _error;
 
   Future<void> checkForTaskResets({bool force = false}) async {
-    // Only check once per hour maximum to avoid excessive checks
     final now = DateTime.now();
-    if (!force && now.difference(_lastCheckTime).inMinutes < 1 && _lastCheckTime != null) {
-      debugPrint("Skipping task reset check - last check was less than 60 minutes ago");
-      return;
-    }
 
     _lastCheckTime = now;
     debugPrint("Checking for tasks that need to be reset...");
@@ -539,7 +500,7 @@ class TaskProvider with ChangeNotifier {
       taskData['lastResetTime'] = now.toIso8601String();
       debugPrint("Calculating next reset time for ${taskData['type']} task...");
       
-      // For new tasks, we want to set the due date to today's or tomorrow's reset time
+      // For new tasks, set the due date to today's or tomorrow's reset time
       final currentYear = DateTime.now().year;
       final today = DateTime(currentYear, now.month, now.day);
       final nextResetTime = _resetService.calculateNextResetTime(taskData['type'], today);
@@ -647,6 +608,7 @@ class TaskProvider with ChangeNotifier {
     );
   }
 
+  // Check whether user can level up after task completion
   Future<int> checkAndProcessLevelUp(
       DocumentReference userRef,
       int currentXp,
@@ -675,7 +637,6 @@ class TaskProvider with ChangeNotifier {
   }
 
   // Mark a task as complete and award rewards
-  // Modified completeTask method to update battle stats when base stats change
   Future<TaskReward> completeTask(String taskId) async {
     if (_auth.currentUser == null) {
       throw Exception('User not authenticated');
@@ -734,7 +695,6 @@ class TaskProvider with ChangeNotifier {
           throw Exception('Task document not found');
         }
 
-        // Now that all reads are complete, we can do our writes
 
         // Mark task as completed
         transaction.update(taskRef, {
@@ -829,9 +789,10 @@ class TaskProvider with ChangeNotifier {
         } else {
           // If the battle stats document doesn't exist, create it with initial values
           transaction.set(battleStatsRef, {
-            'phyatk': rewards.stats['strength'] ?? 0,
-            'magatk': rewards.stats['intelligence'] ?? 0,
-            // Can add other battle stats here as needed
+            'phyatk': 5+(rewards.stats['strength']!-1),
+            'magatk': 5+(rewards.stats['intelligence']!-1),
+            'phydef': 5,
+            'magdef': 5,
           });
         }
 
@@ -1138,93 +1099,7 @@ class TaskProvider with ChangeNotifier {
 
 }
 
-// Create a Reward Dialog widget to display task rewards
-class RewardDialog extends StatelessWidget {
-  final TaskReward reward;
-  final String taskTitle;
 
-  const RewardDialog({
-    Key? key,
-    required this.reward,
-    required this.taskTitle,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Task Completed!'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('You completed: $taskTitle', style: TextStyle(fontWeight: FontWeight.bold)),
-          SizedBox(height: 20),
-          Text('Rewards earned:', style: TextStyle(fontSize: 16)),
-          SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.star, color: Colors.amber),
-              SizedBox(width: 5),
-              Text('XP: +${reward.xp}', style: TextStyle(fontSize: 16)),
-            ],
-          ),
-          SizedBox(height: 5),
-          Row(
-            children: [
-              Icon(Icons.monetization_on, color: Colors.amber),
-              SizedBox(width: 5),
-              Text('Gold: +${reward.gold}', style: TextStyle(fontSize: 16)),
-            ],
-          ),
-
-          // Display stat rewards if any
-          if (reward.stats.values.any((val) => val > 0)) ...[
-            SizedBox(height: 10),
-            Text('Stat points:', style: TextStyle(fontSize: 16)),
-            SizedBox(height: 5),
-            if (reward.stats['strength']! > 0)
-              Row(
-                children: [
-                  Icon(Icons.fitness_center, color: Colors.red),
-                  SizedBox(width: 5),
-                  Text('STR: +${reward.stats['strength']}', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            if (reward.stats['intelligence']! > 0)
-              Row(
-                children: [
-                  Icon(Icons.school, color: Colors.blue),
-                  SizedBox(width: 5),
-                  Text('INT: +${reward.stats['intelligence']}', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            if (reward.stats['vitality']! > 0)
-              Row(
-                children: [
-                  Icon(Icons.favorite, color: Colors.green),
-                  SizedBox(width: 5),
-                  Text('VIT: +${reward.stats['vitality']}', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            if (reward.stats['wisdom']! > 0)
-              Row(
-                children: [
-                  Icon(Icons.lightbulb, color: Colors.purple),
-                  SizedBox(width: 5),
-                  Text('WIS: +${reward.stats['wisdom']}', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('OK'),
-        ),
-      ],
-    );
-  }
-}
 
 class TaskPage extends StatefulWidget {
   @override
@@ -1232,7 +1107,7 @@ class TaskPage extends StatefulWidget {
 }
 
 class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin {
-  bool showOngoing = true;
+  bool showOngoing = true; // Determines whether to show 'Ongoing' or 'Completed' Tasks Page
   bool _isInitialized = false;
 
   @override
@@ -1274,6 +1149,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
     }
   }
 
+  // Display addTask dialog
   void addTask(BuildContext context) {
     TextEditingController titleController = TextEditingController();
     TextEditingController descController = TextEditingController();
@@ -1294,6 +1170,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    //Title Input
                     TextField(
                       controller: titleController,
                       decoration: InputDecoration(
@@ -1303,14 +1180,19 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                             : null,
                       ),
                     ),
+
+                    // Description input
                     TextField(
                       controller: descController,
                       decoration: InputDecoration(
                         labelText: 'Description (Optional)',
                       ),
                     ),
+
+                    // Type Dropdown Menu
                     DropdownButtonFormField(
                       value: selectedType,
+                      // Maps each type to the dropdown menu
                       items: ['Daily', 'Weekly', 'Monthly', 'One-Time']
                           .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                           .toList(),
@@ -1321,8 +1203,11 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                       },
                       decoration: InputDecoration(labelText: 'Type'),
                     ),
+
+                    // Category Dropdown menu
                     DropdownButtonFormField(
                       value: selectedCategory,
+                      // Maps each category to the dropdown menu
                       items: ['Physical', 'Intellectual', 'Academic', 'Lifestyle', 'Miscellaneous']
                           .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
                           .toList(),
@@ -1333,6 +1218,8 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                       },
                       decoration: InputDecoration(labelText: 'Category'),
                     ),
+
+                    //Difficulty 3-way toggle-button
                     Padding(
                       padding: EdgeInsets.only(top: 16),
                       child: ToggleButtons(
@@ -1357,6 +1244,8 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                         ],
                       ),
                     ),
+
+                    // If type is One-Time, show due date picker
                     if (selectedType == 'One-Time')
                       TextButton(
                         onPressed: () async {
@@ -1411,10 +1300,12 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
     );
   }
 
+  // Show dialog for editing tasks
   void editTask(BuildContext context, Map<String, dynamic> task) {
     TaskDialogService.showEditTaskDialog(context, task);
   }
 
+  // Show Filter Dialog
   void showFilterDialog(BuildContext context) {
     final taskProvider = Provider.of<TaskProvider>(context, listen: false);
 
@@ -1435,6 +1326,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+
                     // Search by name
                     TextField(
                       controller: searchController,
@@ -1442,6 +1334,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                         labelText: 'Search by Name',
                       ),
                     ),
+
                     // Filter by Type
                     DropdownButtonFormField(
                       value: selectedType,
@@ -1455,6 +1348,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                       },
                       decoration: InputDecoration(labelText: 'Type'),
                     ),
+
                     // Filter by Category
                     DropdownButtonFormField(
                       value: selectedCategory,
@@ -1468,6 +1362,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                       },
                       decoration: InputDecoration(labelText: 'Category'),
                     ),
+
                     // Filter by Difficulty
                     Padding(
                       padding: EdgeInsets.only(top: 16),
@@ -1498,6 +1393,8 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                   ],
                 ),
               ),
+
+              // Reset Filters
               actions: [
                 TextButton(
                   child: Text('Reset'),
@@ -1511,10 +1408,14 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                     Navigator.pop(context);
                   },
                 ),
+
+                // Cancel Filter Select
                 TextButton(
                   child: Text('Cancel'),
                   onPressed: () => Navigator.pop(context),
                 ),
+
+                // Apply Filters
                 TextButton(
                   child: Text('Apply'),
                   onPressed: () {
@@ -1622,6 +1523,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
     );
   }
 
+  // If no tasks, show empty list indicator
   Widget _buildEmptyListWidget(bool isOngoing) {
     return Center(
       child: Column(
@@ -1715,6 +1617,8 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refreshTasks,
+
+                // Shows Task List
                 child: showOngoing
                     ? (taskProvider.ongoingTasks.isEmpty
                     ? ListView(
@@ -1746,7 +1650,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                       ),
                       confirmDismiss: (direction) async {
                         if (direction == DismissDirection.startToEnd) {
-                          // Complete task
+                          // Complete task if swiping left to right
                           await _handleTaskCompletion(
                               context, task['id'], task['title']);
                           return false; // Don't dismiss the item
@@ -1776,6 +1680,7 @@ class _TaskPageState extends State<TaskPage> with AutomaticKeepAliveClientMixin 
                           );
                         }
                       },
+                      // Delete task when swiping right to left
                       onDismissed: (direction) {
                         if (direction == DismissDirection.endToStart) {
                           taskProvider.deleteTask(task['id']);

@@ -21,38 +21,33 @@ import 'task_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-
   try {
     print("Initializing Firebase...");
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print("Firebase initialized successfully!");
+
+    final settingsProvider = SettingsProvider();
+    await settingsProvider.loadSettings();
+
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (context) => TaskProvider()),
+          ChangeNotifierProvider(create: (context) => settingsProvider),
+          StreamProvider<User?>.value(
+            value: FirebaseAuth.instance.authStateChanges(),
+            initialData: null,
+          ),
+        ],
+        child: MyApp(),
+      ),
+    );
+
   } catch (e) {
     print("Error initializing Firebase: $e");
   }
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  final settingsProvider = SettingsProvider();
-  await settingsProvider.loadSettings();
-
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (context) => TaskProvider()),
-        ChangeNotifierProvider(create: (context) => settingsProvider),
-        // Add auth state provider
-        StreamProvider<User?>.value(
-          value: FirebaseAuth.instance.authStateChanges(),
-          initialData: null,
-        ),
-      ],
-      child: MyApp(),
-    ),
-  );
 }
 
 
@@ -163,6 +158,7 @@ class MyApp extends StatelessWidget {
       ),
     );
 
+    // Starts App in AuthWrapper(Can be Login, Email Verification, or Home Page)
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: settingsProvider.isDarkMode ? darkTheme : lightTheme,
@@ -171,12 +167,13 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// Handles which screen user sees on app launch
 class AuthWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<User?>(context);
 
-    // If no user, go to login
+    // If no user found, go to login
     if (user == null) {
       return LoginPage();
     }
@@ -187,21 +184,21 @@ class AuthWrapper extends StatelessWidget {
     }
 
     // User is logged in and verified
-    return HomePage();
+    return NavigationPage();
   }
 }
 
 
 
-class HomePage extends StatefulWidget {
+class NavigationPage extends StatefulWidget {
   @override
-  _HomePageState createState() => _HomePageState();
+  _NavigationPageState createState() => _NavigationPageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _NavigationPageState extends State<NavigationPage> {
   int _selectedIndex = 0;
   final List<Widget> _pages = [
-    HomeScreen(),
+    HomePage(),
     TaskPage(),
     GamePage(),
     ShopPage(),
@@ -257,12 +254,12 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class HomeScreen extends StatefulWidget {
+class HomePage extends StatefulWidget {
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomePageState extends State<HomePage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   Map<String, dynamic>? userData;
@@ -275,43 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserData();
   }
 
-  Future<void> checkAndProcessLevelUp() async {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null || userData == null) return;
-
-    final int currentLevel = userData!['userLevel'] ?? 1;
-    final int currentXp = userData!['xp'] ?? 0;
-
-    if (LevelManager.canLevelUp(currentLevel, currentXp)) {
-      // User can level up
-      final int newLevel = currentLevel + 1;
-      final int remainingXp = LevelManager.processLevelUp(currentLevel, currentXp);
-
-      // Update database
-      await _firestore.collection('users').doc(userId).update({
-        'userLevel': newLevel,
-        'xp': remainingXp,
-      });
-
-      // Update local state
-      setState(() {
-        userData!['userLevel'] = newLevel;
-        userData!['xp'] = remainingXp;
-      });
-
-      // Show level up notification
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Congratulations! You leveled up to level $newLevel!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      // Check if user can level up again (in case they earned a lot of XP)
-      checkAndProcessLevelUp();
-    }
-  }
-
+  // Fetch user data from database and load for display
   Future<void> _loadUserData() async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -354,6 +315,45 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Check whether user can level up
+  Future<void> checkAndProcessLevelUp() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null || userData == null) return;
+
+    final int currentLevel = userData!['userLevel'] ?? 1;
+    final int currentXp = userData!['xp'] ?? 0;
+
+    if (LevelManager.canLevelUp(currentLevel, currentXp)) {
+      // User can level up
+      final int newLevel = currentLevel + 1;
+      final int remainingXp = LevelManager.processLevelUp(currentLevel, currentXp);
+
+      // Update database
+      await _firestore.collection('users').doc(userId).update({
+        'userLevel': newLevel,
+        'xp': remainingXp,
+      });
+
+      // Update local state
+      setState(() {
+        userData!['userLevel'] = newLevel;
+        userData!['xp'] = remainingXp;
+      });
+
+      // Show level up notification
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Congratulations! You leveled up to level $newLevel!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Check if user can level up again (in case they earned a lot of XP)
+      checkAndProcessLevelUp();
+    }
+  }
+
+  // Returns the 3 most urgent tasks based on due date, frequency, and difficulty.
   List<Map<String, dynamic>> _getUrgentTasks(TaskProvider taskProvider) {
     // Get all ongoing tasks
     List<Map<String, dynamic>> tasks = List.from(taskProvider.ongoingTasks);
@@ -405,102 +405,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final taskProvider = Provider.of<TaskProvider>(context);
     final urgentTasks = _getUrgentTasks(taskProvider);
 
-    return _isLoading
-        ? Center(child: CircularProgressIndicator())
-        : Scaffold(
+    return _isLoading ? Center(child: CircularProgressIndicator()) : Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              color: Colors.deepPurple,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.white,
-                      child: Text(
-                        _getInitials(userData?['name'] ?? ''),
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepPurple,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Class: ${className ?? "Unknown"}',
-                              style: TextStyle(color: Colors.white, fontSize: 18)),
-                          Text('Level: ${userData?['userLevel'] ?? "1"}',
-                              style: TextStyle(color: Colors.white)),
-                          Row(
-                            children: [
-                              Icon(Icons.monetization_on, color: Colors.amber, size: 16),
-                              SizedBox(width: 4),
-                              Text('Gold: ${userData?['gold'] ?? "0"}',
-                                  style: TextStyle(color: Colors.white)),
-                              SizedBox(width: 12),
-                              Icon(Icons.diamond, color: Colors.lightBlueAccent, size: 16),
-                              SizedBox(width: 4),
-                              Text('Gems: ${userData?['gems'] ?? "0"}',
-                                  style: TextStyle(color: Colors.white)),
-                            ],
-                          ),
-                          SizedBox(height: 10),
-                          Text('Health: ${userData?['health'] ?? 0}/${userData?['maxHealth'] ?? 100}',
-                              style: TextStyle(color: Colors.white)),
-                          LinearProgressIndicator(
-                            value: (userData?['health'] ?? 0) / (userData?['maxHealth'] ?? 100),
-                            backgroundColor: Colors.grey,
-                            color: Colors.red,
-                          ),
-                          SizedBox(height: 5),
-                          Text('XP', style: TextStyle(color: Colors.white)),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'XP Progress',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                              SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: LinearProgressIndicator(
-                                      value: (userData!['xp'] ?? 0) /
-                                          LevelManager.getRequiredXpForLevel(userData!['userLevel'] ?? 1),
-                                      backgroundColor: Colors.grey[300],
-                                      color: Colors.blue,
-                                      minHeight: 8,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '${userData!['xp'] ?? 0}/${LevelManager.getRequiredXpForLevel(userData!['userLevel'] ?? 1)}',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // Display user info overview
+            UserProfileCard(
+              userData: userData!,
+              className: className ?? "Unknown",
             ),
             SizedBox(height: 20),
+
+            //Display most urgent tasks
             Text("Urgent Tasks",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             if (urgentTasks.isEmpty)
@@ -532,23 +450,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  String _getInitials(String name) {
-    List<String> nameSplit = name.split(" ");
-    String initials = "";
-
-    if (nameSplit.length > 0) {
-      if (nameSplit[0].isNotEmpty) {
-        initials += nameSplit[0][0];
-      }
-
-      if (nameSplit.length > 1 && nameSplit[1].isNotEmpty) {
-        initials += nameSplit[1][0];
-      }
-    }
-
-    return initials.toUpperCase();
   }
 }
 

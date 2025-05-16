@@ -6,9 +6,14 @@ import 'task_page.dart';
 
 
 class TaskDialogService {
+  // Shows Task Editor Dialog
   static void showEditTaskDialog(BuildContext context, Map<String, dynamic> task) {
+
+    // Controllers for text fields
     TextEditingController titleController = TextEditingController(text: task['title']);
     TextEditingController descController = TextEditingController(text: task['description'] ?? '');
+
+    // Populate Dropdown and toggle button fields
     String selectedType = task['type'];
     String selectedCategory = task['category'];
     String selectedDifficulty = task['difficulty'];
@@ -27,11 +32,15 @@ class TaskDialogService {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+
+              // Change title to 'View Task' if task completed
               title: Text(isCompleted ? 'View Task' : 'Edit Task'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+
+                    // Task Title
                     TextField(
                       controller: titleController,
                       decoration: InputDecoration(
@@ -40,18 +49,24 @@ class TaskDialogService {
                             ? 'Required'
                             : null,
                       ),
-                      enabled: !isCompleted,
+                      enabled: !isCompleted,// Disable if task is completed
                     ),
+
+                    // Description
                     TextField(
                       controller: descController,
                       decoration: InputDecoration(labelText: 'Description (Optional)'),
-                      enabled: !isCompleted,
+                      enabled: !isCompleted,// Disable if task is completed
                     ),
+
+                    // Task Type Dropdown
                     DropdownButtonFormField(
                       value: selectedType,
                       items: ['Daily', 'Weekly', 'Monthly', 'One-Time']
                           .map((type) => DropdownMenuItem(value: type, child: Text(type)))
                           .toList(),
+
+                      // Disable dropdown if task completed
                       onChanged: isCompleted
                           ? null
                           : (value) {
@@ -61,11 +76,14 @@ class TaskDialogService {
                       },
                       decoration: InputDecoration(labelText: 'Type'),
                     ),
+
+                    // Task Category Dropdown
                     DropdownButtonFormField(
                       value: selectedCategory,
                       items: ['Physical', 'Intellectual', 'Academic', 'Lifestyle', 'Miscellaneous']
                           .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
                           .toList(),
+                      // Disable dropdown if task completed
                       onChanged: isCompleted
                           ? null
                           : (value) {
@@ -75,6 +93,8 @@ class TaskDialogService {
                       },
                       decoration: InputDecoration(labelText: 'Category'),
                     ),
+
+                    // Task Difficulty 3-way toggle button
                     Padding(
                       padding: EdgeInsets.only(top: 16),
                       child: ToggleButtons(
@@ -83,6 +103,7 @@ class TaskDialogService {
                           selectedDifficulty == 'Medium',
                           selectedDifficulty == 'Hard',
                         ],
+                        // Disable button if task completed
                         onPressed: isCompleted
                             ? null
                             : (int index) {
@@ -101,6 +122,8 @@ class TaskDialogService {
                         ],
                       ),
                     ),
+
+                    // If type is 'One-Time' show due date picker
                     if (selectedType == 'One-Time')
                       isCompleted
                           ? Text(
@@ -131,11 +154,15 @@ class TaskDialogService {
                   ],
                 ),
               ),
+
+              // Close Button
               actions: [
                 TextButton(
                   child: Text('Close'),
                   onPressed: () => Navigator.pop(context),
                 ),
+
+                // Only show Delete and Save buttons for ongoing tasks
                 if (!isCompleted)
                   TextButton(
                     child: Text('Delete'),

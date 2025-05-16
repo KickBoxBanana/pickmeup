@@ -4,20 +4,44 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 //Helper Functions
-int max(int a, int b) {
-  if(a>b)
-    return a;
-  else
-    return b;
+void showLevelUpDialog(BuildContext context, int newLevel) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Level Up!'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.arrow_upward, color: Colors.amber, size: 50),
+          SizedBox(height: 16),
+          Text(
+            'Congratulations!',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'You have reached level $newLevel',
+            style: TextStyle(fontSize: 16),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Keep up the good work!',
+            style: TextStyle(fontStyle: FontStyle.italic),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('OK'),
+        ),
+      ],
+    ),
+  );
 }
 
-int min(int a, int b) {
-  if(a<b)
-    return a;
-  else
-    return b;
-}
 
+// Skill data model
 class Skill {
   final String id;
   final String name;
@@ -45,6 +69,7 @@ class Skill {
     this.duration,
   });
 
+  // Parses skills from firestore
   factory Skill.fromMap(Map<String, dynamic> map, String id) {
     try {
       // Ensure numeric values are properly converted from possible string representation
@@ -114,6 +139,7 @@ class Skill {
     }
   }
 
+  // Converts to map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -131,6 +157,7 @@ class Skill {
   }
 }
 
+// Represents an active buff in combat
 class ActiveBuff {
   final String skillId;
   final String name;
@@ -145,6 +172,7 @@ class ActiveBuff {
   });
 }
 
+// Handles buff logic for players/enemies
 class BuffManager {
   List<ActiveBuff> playerBuffs = [];
   List<ActiveBuff> enemyBuffs = [];
@@ -210,12 +238,13 @@ class BuffManager {
   }
 }
 
+// Manages Level Progression
 class LevelManager {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Calculate XP required for a specific level
-  // This creates an exponential curve where each level requires more XP
+  // Creates an exponential curve where each level requires more XP
   static int getRequiredXpForLevel(int level) {
     // Base XP for level 1
     const int baseXp = 100;
@@ -268,20 +297,17 @@ class LevelManager {
           newLevel = currentLevel;  // Store the latest level for return value
           currentXp = processLevelUp(currentLevel - 1, currentXp);
 
-          // Apply additional rewards for leveling up if desired
-          // For example, give bonus health/mana/gold on level up
-
           // Could add level-up bonuses here
-          // Example: int healthBonus = currentLevel * 5;
+          // Ex: int healthBonus = currentLevel * 5;
           // transaction.update(userRef, {'maxHealth': FieldValue.increment(healthBonus)});
         }
 
-        // Only update if we leveled up
+        // Only update if user leveled up
         if (leveledUp) {
           transaction.update(userRef, {
             'userLevel': currentLevel,
             'xp': currentXp,
-            // Add any other level up rewards here
+            // Add extra level up rewards here
           });
         }
       });

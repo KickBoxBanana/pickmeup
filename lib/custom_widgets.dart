@@ -1,10 +1,147 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'game_mechanics.dart';
 import 'main.dart';
+import 'task_page.dart';
 
+// Displays basic user info on a card widget
+class UserProfileCard extends StatelessWidget {
+  final Map<String, dynamic> userData; // User data map containing stats like name, level, health, etc.
+  final String className;
+
+
+  const UserProfileCard({
+    super.key,
+    required this.userData,
+    required this.className,
+  });
+
+  // Returns user's intials based on their name
+  String _getInitials(String name) {
+    List<String> nameSplit = name.split(" ");
+    String initials = "";
+
+    if (nameSplit.isNotEmpty && nameSplit[0].isNotEmpty) {
+      initials += nameSplit[0][0];
+    }
+    if (nameSplit.length > 1 && nameSplit[1].isNotEmpty) {
+      initials += nameSplit[1][0];
+    }
+
+    return initials.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Get values from userData map, otherwise use defaults
+    final String name = userData['name'] ?? '';
+    final int level = userData['userLevel'] ?? 1;
+    final int gold = userData['gold'] ?? 0;
+    final int gems = userData['gems'] ?? 0;
+    final int health = userData['health'] ?? 0;
+    final int maxHealth = userData['maxHealth'] ?? 100;
+    final int xp = userData['xp'] ?? 0;
+    final int xpRequired = LevelManager.getRequiredXpForLevel(level);
+
+    return Card(
+      color: Colors.deepPurple,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Avatar with user intials
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.white,
+              child: Text(
+                _getInitials(name),
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepPurple,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // User basic info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Class and Level
+                  Text('Class: $className',
+                      style: const TextStyle(color: Colors.white, fontSize: 18)),
+                  Text('Level: $level',
+                      style: const TextStyle(color: Colors.white)),
+
+                  // Gold and Gems
+                  Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: Colors.amber, size: 16),
+                      const SizedBox(width: 4),
+                      Text('Gold: $gold',
+                          style: const TextStyle(color: Colors.white)),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.diamond, color: Colors.lightBlueAccent, size: 16),
+                      const SizedBox(width: 4),
+                      Text('Gems: $gems',
+                          style: const TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Health and XP Bars
+                  Text('Health: $health/$maxHealth',
+                      style: const TextStyle(color: Colors.white)),
+                  LinearProgressIndicator(
+                    value: health / maxHealth,
+                    backgroundColor: Colors.grey,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 5),
+                  const Text('XP', style: TextStyle(color: Colors.white)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'XP Progress',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LinearProgressIndicator(
+                              value: xp / xpRequired,
+                              backgroundColor: Colors.grey[300],
+                              color: Colors.blue,
+                              minHeight: 8,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$xp/$xpRequired',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Displays basic task info (title, category, type, due/completed date)
 class TaskCard extends StatelessWidget {
   final String title, type, category;
   final VoidCallback? onComplete;
@@ -22,7 +159,7 @@ class TaskCard extends StatelessWidget {
     this.completedDate,
   });
 
-  // Define colors for different types - keeping these as they are task-specific visual indicators
+  // Define colors for different types
   final Map<String, Color> typeColors = {
     'Daily': Colors.deepPurple,
     'Weekly': Colors.blue,
@@ -30,7 +167,7 @@ class TaskCard extends StatelessWidget {
     'One-Time': Colors.redAccent,
   };
 
-  // Define colors for different categories - keeping these as they are task-specific visual indicators
+  // Define colors for different categories
   final Map<String, Color> categoryColors = {
     'Physical': Colors.orange,
     'Intellectual': Colors.green,
@@ -40,7 +177,6 @@ class TaskCard extends StatelessWidget {
   };
 
   @override
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -48,14 +184,15 @@ class TaskCard extends StatelessWidget {
         onTap: onTap,
         child: Card(
           elevation: 4, // Increased elevation for more shadow
-          margin: EdgeInsets.symmetric(vertical: 6, horizontal: 8), // Add some margin
+          margin: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12), // Slightly larger radius
+            borderRadius: BorderRadius.circular(12),
             side: BorderSide(  // Add a subtle border
               color: theme.colorScheme.primary.withOpacity(0.3),
               width: 1,
             ),
           ),
+
           // Apply a slight gradient to make the card pop
           child: Container(
             decoration: BoxDecoration(
@@ -74,8 +211,7 @@ class TaskCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Rest of your existing row layout...
-                // Mark Complete Button (Left Side)
+                // Mark Complete Button
                 if (onComplete != null)
                   IconButton(
                     icon: Icon(Icons.check_circle,
@@ -83,6 +219,7 @@ class TaskCard extends StatelessWidget {
                         size: 28),
                     onPressed: onComplete,
                   )
+                  //Disable Button if task is completed
                 else
                   Padding(
                     padding: EdgeInsets.all(8.0),
@@ -91,7 +228,7 @@ class TaskCard extends StatelessWidget {
                         size: 28),
                   ),
 
-                // Task Name (Centered)
+                // Task Title
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -134,12 +271,13 @@ class TaskCard extends StatelessWidget {
                         width: 1
                     )),
                     borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(12),  // Matched to outer radius
-                      bottomRight: Radius.circular(12),  // Matched to outer radius
+                      topRight: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
                     ),
                   ),
                   child: Column(
                     children: [
+
                       // Type Section (Top)
                       Container(
                         width: double.infinity,
@@ -161,6 +299,7 @@ class TaskCard extends StatelessWidget {
                           ),
                         ),
                       ),
+
                       // Category Section (Bottom)
                       Container(
                         width: double.infinity,
@@ -174,7 +313,7 @@ class TaskCard extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.white,
-                            fontWeight: FontWeight.bold,  // Make text bolder
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -189,6 +328,7 @@ class TaskCard extends StatelessWidget {
   }
 }
 
+// Displays basic enemy info (sprite, name, level, health, rewards)
 class EnemyCard extends StatelessWidget {
   final Map<String, dynamic> enemy;
   final VoidCallback onTap;
@@ -203,7 +343,7 @@ class EnemyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool isBoss = enemy['isBoss'] ?? false;
-    final rewardGold = enemy['rewardGold'] ?? 0;
+    final rewardGems = enemy['rewardGold'] ?? 0;
     final rewardXp = enemy['rewardXp'] ?? 0;
     final enemyMaxHealth = enemy['maxHealth'] ?? 100;
     final enemyHealth = enemy['health'] ?? enemyMaxHealth;
@@ -252,6 +392,7 @@ class EnemyCard extends StatelessWidget {
         elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          // If enemy is boss, highlight card with red border
           side: isBoss
               ? BorderSide(color: Colors.red, width: 2)
               : BorderSide.none,
@@ -394,7 +535,7 @@ class EnemyCard extends StatelessWidget {
                             Icon(Icons.diamond,
                                 color: Colors.lightBlueAccent, size: 16),
                             SizedBox(width: 4),
-                            Text('$rewardGold Gems'),
+                            Text('$rewardGems Gems'),
                             SizedBox(width: 16),
                             Icon(Icons.star,
                                 color: Colors.blue, size: 16),
@@ -487,6 +628,7 @@ class _ItemCardState extends State<ItemCard> {
               offset: Offset(0, 2),
             ),
           ],
+
           // Add a subtle gradient overlay to enhance the background
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -637,10 +779,8 @@ class _ItemCardState extends State<ItemCard> {
   }
 }
 
-
-
 class SkillCard extends StatelessWidget {
-  final Map<String, dynamic> skill;
+  final Map<String, dynamic> skill; // Skill data from firestore
   final bool isLearned;
   final bool isExpanded;
   final VoidCallback onTap;
@@ -738,6 +878,7 @@ class SkillCard extends StatelessWidget {
           ),
         )
             : Center(
+          // Skill Icon
           child: Icon(
             _getSkillIcon(skill['type'] ?? 'basic'),
             color: isLearned ? Colors.white : theme.iconTheme.color,
@@ -748,6 +889,7 @@ class SkillCard extends StatelessWidget {
     );
   }
 
+  // Builds a tiny button with an icon and label
   Widget _buildCompactButton(
       BuildContext context, {
         required IconData icon,
@@ -762,14 +904,14 @@ class SkillCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            size: 12, // Further reduced icon size
+            size: 12,
             color: isLearned ? Colors.white : Theme.of(context).iconTheme.color,
           ),
-          const SizedBox(height: 1), // Reduced spacing
+          const SizedBox(height: 1),
           Text(
             label,
             style: TextStyle(
-              fontSize: 8, // Further reduced font size
+              fontSize: 8,
               color: isLearned ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
             ),
           ),
@@ -778,6 +920,7 @@ class SkillCard extends StatelessWidget {
     );
   }
 
+  // Get skill icon depending on skill type
   IconData _getSkillIcon(String skillType) {
     switch (skillType.toLowerCase()) {
       case 'attack':
@@ -796,107 +939,91 @@ class SkillCard extends StatelessWidget {
   }
 }
 
-class ConnectionsPainter extends CustomPainter {
-  final Map<String, Offset> skillPositions;
-  final List<Map<String, dynamic>> connections;
-  final Offset panOffset;
-  final double scale;
-  final List<String> learnedSkills;
-  final double collapsedCardWidth;
+// Create a Reward Dialog widget to display task rewards
+class RewardDialog extends StatelessWidget {
+  final TaskReward reward;
+  final String taskTitle;
 
-  ConnectionsPainter({
-    required this.skillPositions,
-    required this.connections,
-    required this.panOffset,
-    required this.scale,
-    required this.learnedSkills,
-    this.collapsedCardWidth = 60.0,
-  });
+  const RewardDialog({
+    Key? key,
+    required this.reward,
+    required this.taskTitle,
+  }) : super(key: key);
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(collapsedCardWidth / 2, collapsedCardWidth / 2); // Center offset of skill card
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Task Completed!'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('You completed: $taskTitle', style: TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(height: 20),
+          Text('Rewards earned:', style: TextStyle(fontSize: 16)),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.star, color: Colors.amber),
+              SizedBox(width: 5),
+              Text('XP: +${reward.xp}', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+          SizedBox(height: 5),
+          Row(
+            children: [
+              Icon(Icons.monetization_on, color: Colors.amber),
+              SizedBox(width: 5),
+              Text('Gold: +${reward.gold}', style: TextStyle(fontSize: 16)),
+            ],
+          ),
 
-    for (var connection in connections) {
-      final fromId = connection['from'];
-      final toId = connection['to'];
-
-      final fromPosition = skillPositions[fromId];
-      final toPosition = skillPositions[toId];
-
-      if (fromPosition != null && toPosition != null) {
-        final adjustedFromPos = fromPosition * scale + panOffset + center;
-        final adjustedToPos = toPosition * scale + panOffset + center;
-
-        // Determine if both skills are learned
-        final fromLearned = learnedSkills.contains(fromId);
-        final toLearned = learnedSkills.contains(toId);
-
-        // Set line color based on learned status
-        final paint = Paint()
-          ..color = fromLearned && toLearned
-              ? Colors.green
-              : fromLearned
-              ? Colors.blue
-              : Colors.grey
-          ..strokeWidth = fromLearned && toLearned ? 3.0 : 2.0
-          ..style = PaintingStyle.stroke;
-
-        // Draw connection line
-        canvas.drawLine(adjustedFromPos, adjustedToPos, paint);
-
-        // Draw arrow at the end of the line
-        _drawArrow(canvas, adjustedFromPos, adjustedToPos, paint);
-      }
-    }
-  }
-
-  void _drawArrow(Canvas canvas, Offset start, Offset end, Paint paint) {
-    // Calculate arrow direction
-    final dx = end.dx - start.dx;
-    final dy = end.dy - start.dy;
-    final distance = sqrt(dx * dx + dy * dy);
-
-    // Normalize direction vector
-    final directionX = distance > 0 ? dx / distance : 0;
-    final directionY = distance > 0 ? dy / distance : 0;
-
-    final arrowSize = 10.0 * scale;
-
-    // Calculate arrow points
-    final arrowTip = Offset(
-        end.dx - directionX * 10.0 * scale,
-        end.dy - directionY * 10.0 * scale
-    ); // Pull back a bit from end
-
-    // Perpendicular vector
-    final perpX = -directionY;
-    final perpY = directionX;
-
-    final arrowBase1 = Offset(
-        arrowTip.dx - directionX * arrowSize + perpX * arrowSize / 2,
-        arrowTip.dy - directionY * arrowSize + perpY * arrowSize / 2
+          // Display stat rewards if any
+          if (reward.stats.values.any((val) => val > 0)) ...[
+            SizedBox(height: 10),
+            Text('Stat points:', style: TextStyle(fontSize: 16)),
+            SizedBox(height: 5),
+            if (reward.stats['strength']! > 0)
+              Row(
+                children: [
+                  Icon(Icons.fitness_center, color: Colors.red),
+                  SizedBox(width: 5),
+                  Text('STR: +${reward.stats['strength']}', style: TextStyle(fontSize: 16)),
+                ],
+              ),
+            if (reward.stats['intelligence']! > 0)
+              Row(
+                children: [
+                  Icon(Icons.school, color: Colors.blue),
+                  SizedBox(width: 5),
+                  Text('INT: +${reward.stats['intelligence']}', style: TextStyle(fontSize: 16)),
+                ],
+              ),
+            if (reward.stats['vitality']! > 0)
+              Row(
+                children: [
+                  Icon(Icons.favorite, color: Colors.green),
+                  SizedBox(width: 5),
+                  Text('VIT: +${reward.stats['vitality']}', style: TextStyle(fontSize: 16)),
+                ],
+              ),
+            if (reward.stats['wisdom']! > 0)
+              Row(
+                children: [
+                  Icon(Icons.lightbulb, color: Colors.purple),
+                  SizedBox(width: 5),
+                  Text('WIS: +${reward.stats['wisdom']}', style: TextStyle(fontSize: 16)),
+                ],
+              ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('OK'),
+        ),
+      ],
     );
-
-    final arrowBase2 = Offset(
-        arrowTip.dx - directionX * arrowSize - perpX * arrowSize / 2,
-        arrowTip.dy - directionY * arrowSize - perpY * arrowSize / 2
-    );
-
-    // Draw arrow head
-    final path = Path()
-      ..moveTo(end.dx, end.dy)
-      ..lineTo(arrowBase1.dx, arrowBase1.dy)
-      ..lineTo(arrowBase2.dx, arrowBase2.dy)
-      ..close();
-
-    canvas.drawPath(path, paint..style = PaintingStyle.fill);
-  }
-
-  @override
-  bool shouldRepaint(ConnectionsPainter oldDelegate) {
-    return oldDelegate.panOffset != panOffset ||
-        oldDelegate.scale != scale ||
-        oldDelegate.learnedSkills != learnedSkills;
   }
 }
+
