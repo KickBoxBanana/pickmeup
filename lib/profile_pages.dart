@@ -25,7 +25,6 @@ class _ProfilePageState extends State<ProfilePage> {
   String? armorLayerSprite;
   String? cosmeticLayerSprite;
 
-
   Map<String, dynamic>? userData;
   Map<String, dynamic>? baseStats;
   Map<String, dynamic>? battleStats;
@@ -39,58 +38,10 @@ class _ProfilePageState extends State<ProfilePage> {
   String currentInventoryTab = 'Weapons';
   bool _isLoading = true;
 
-  Map<String, dynamic> _cachedUserData = {};
-  DateTime _lastDataLoadTime = DateTime.now();
-  final _cacheValidityDuration = Duration(minutes: 5);
-
-  bool get _isCacheValid {
-    return _cachedUserData.isNotEmpty &&
-        DateTime.now().difference(_lastDataLoadTime) < _cacheValidityDuration;
-  }
-
   @override
   void initState() {
     super.initState();
-    // Use cache if valid, otherwise load fresh
-    if (_isCacheValid) {
-      _loadFromCache();
-    } else {
-      _loadUserData();
-    }
-  }
-
-  void _loadFromCache() {
-    setState(() {
-      userData = _cachedUserData['userData'];
-      baseStats = _cachedUserData['baseStats'];
-      battleStats = _cachedUserData['battleStats'];
-      userAvatarLayers = _cachedUserData['avatarLayers'];
-      equippedWeapon = _cachedUserData['equippedWeapon'];
-      equippedArmor = _cachedUserData['equippedArmor'];
-      equippedCosmetic = _cachedUserData['equippedCosmetic'];
-      weaponInventory = List<Map<String, dynamic>>.from(_cachedUserData['weaponInventory'] ?? []);
-      armorInventory = List<Map<String, dynamic>>.from(_cachedUserData['armorInventory'] ?? []);
-      cosmeticInventory = List<Map<String, dynamic>>.from(_cachedUserData['cosmeticInventory'] ?? []);
-
-      _updateAvatarLayers();
-      _isLoading = false;
-    });
-  }
-
-  void _updateCache() {
-    _cachedUserData = {
-      'userData': userData,
-      'baseStats': baseStats,
-      'battleStats': battleStats,
-      'avatarLayers': userAvatarLayers,
-      'equippedWeapon': equippedWeapon,
-      'equippedArmor': equippedArmor,
-      'equippedCosmetic': equippedCosmetic,
-      'weaponInventory': weaponInventory,
-      'armorInventory': armorInventory,
-      'cosmeticInventory': cosmeticInventory,
-    };
-    _lastDataLoadTime = DateTime.now();
+    _loadUserData();
   }
 
   Future<void> _loadUserData() async {
@@ -150,14 +101,10 @@ class _ProfilePageState extends State<ProfilePage> {
         // Update avatar layers
         _updateAvatarLayers();
 
-
-        _updateCache();
-
         setState(() {
           _isLoading = false;
         });
       }
-
 
     } catch (e) {
       print('Error loading user data: $e');
@@ -265,7 +212,6 @@ class _ProfilePageState extends State<ProfilePage> {
       if (weaponsSnapshot.exists && weaponsSnapshot.data() != null) {
         final weaponsData = weaponsSnapshot.data()!;
 
-        // Debug what's inside the document
         print('Weapons data keys: ${weaponsData.keys}');
 
         // Check if the items field exists in any form
@@ -444,79 +390,96 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  void _updateAvatarSprite() {
-    if (userAvatar == null) return;
+  Future<void> _updateBattleStats() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
 
-    // Start with base sprite
-    currentAvatarSprite = userAvatar!.baseSprite;
+    try {
+      // Calculate total stats including equipment
+      final totalStats = calculateTotalStats();
 
-    // Check if any items are equipped and if they have matching sprites
-    if (equippedWeapon != null) {
-      String? weaponId = equippedWeapon!['id'];
-      if (userAvatar!.weaponSprites.containsKey(weaponId)) {
-        currentAvatarSprite = userAvatar!.weaponSprites[weaponId];
-      }
-    }
+      // Update battle stats in Firestore
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('stats')
+          .doc('battle')
+          .update({
+        'phyatk': totalStats['phyatk'],
+        'phydef': totalStats['phydef'],
+        'magatk': totalStats['magatk'],
+        'magdef': totalStats['magdef'],
+      });
 
-    if (equippedArmor != null) {
-      String? armorId = equippedArmor!['id'];
-      if (userAvatar!.armorSprites.containsKey(armorId)) {
-        currentAvatarSprite = userAvatar!.armorSprites[armorId];
-      }
-    }
+      // Update local battle stats
+      battleStats = {
+        'phyatk': totalStats['phyatk'],
+        'phydef': totalStats['phydef'],
+        'magatk': totalStats['magatk'],
+        'magdef': totalStats['magdef'],
+      };
 
-    if (equippedCosmetic != null) {
-      String? cosmeticId = equippedCosmetic!['id'];
-      if (userAvatar!.cosmeticSprites.containsKey(cosmeticId)) {
-        currentAvatarSprite = userAvatar!.cosmeticSprites[cosmeticId];
-      }
-    }
-  }
-
-  void _updateAvatarLayers() {
-    if (userAvatarLayers == null) return;
-
-    // Set base sprite
-    baseAvatarSprite = userAvatarLayers!.baseSprite;
-
-    // Reset layer sprites
-    weaponLayerSprite = null;
-    armorLayerSprite = null;
-    cosmeticLayerSprite = null;
-
-    // Check if weapon is equipped and if it has a matching layer
-    if (equippedWeapon != null) {
-      String weaponId = equippedWeapon!['id'];
-      if (userAvatarLayers!.weaponLayers.containsKey(weaponId)) {
-        weaponLayerSprite = userAvatarLayers!.weaponLayers[weaponId];
-      }
-    }
-
-    // Check if armor is equipped and if it has a matching layer
-    if (equippedArmor != null) {
-      String armorId = equippedArmor!['id'];
-      if (userAvatarLayers!.armorLayers.containsKey(armorId)) {
-        armorLayerSprite = userAvatarLayers!.armorLayers[armorId];
-      }
-    }
-
-    // Check if cosmetic is equipped and if it has a matching layer
-    if (equippedCosmetic != null) {
-      String cosmeticId = equippedCosmetic!['id'];
-      if (userAvatarLayers!.cosmeticLayers.containsKey(cosmeticId)) {
-        cosmeticLayerSprite = userAvatarLayers!.cosmeticLayers[cosmeticId];
-      }
+    } catch (e) {
+      print('Error updating battle stats: $e');
     }
   }
 
+  // Calculate total stats including equipment bonuses
+  Map<String, int> calculateTotalStats() {
+    // Base stats from the base stats document
+    int strength = baseStats?['strength'] ?? 10;
+    int intelligence = baseStats?['intelligence'] ?? 10;
+    int vitality = baseStats?['vitality'] ?? 10;
+    int wisdom = baseStats?['wisdom'] ?? 10;
 
+    // Initialize combat stats with base values
+    int phyatk = 5;  // Base physical attack
+    int phydef = 5;  // Base physical defense
+    int magatk = 5;  // Base magical attack
+    int magdef = 5;  // Base magical defense
+
+    // Apply base stat modifiers to combat stats
+    phyatk += strength ~/ 2;  // Each 2 points of strength adds 1 to phyatk
+    phydef += vitality ~/ 2;  // Each 2 points of vitality adds 1 to phydef
+    magatk += intelligence ~/ 2; // Each 2 points of intelligence adds 1 to magatk
+    magdef += wisdom ~/ 2;    // Each 2 points of wisdom adds 1 to magdef
+
+    // Add weapon bonuses if weapon is equipped
+    if (equippedWeapon != null) {
+      phyatk += equippedWeapon?['phyatk'] as int? ?? 0;
+      phydef += equippedWeapon?['phydef'] as int? ?? 0;
+      magatk += equippedWeapon?['magatk'] as int? ?? 0;
+      magdef += equippedWeapon?['magdef'] as int? ?? 0;
+    }
+
+    // Add armor bonuses if armor is equipped
+    if (equippedArmor != null) {
+      phyatk += equippedArmor?['phyatk'] as int? ?? 0;
+      phydef += equippedArmor?['phydef'] as int? ?? 0;
+      magatk += equippedArmor?['magatk'] as int? ?? 0;
+      magdef += equippedArmor?['magdef'] as int? ?? 0;
+    }
+
+    // Debug output
+    print('Calculated stats - phyatk: $phyatk, phydef: $phydef, magatk: $magatk, magdef: $magdef');
+
+    return {
+      'strength': strength,
+      'intelligence': intelligence,
+      'vitality': vitality,
+      'wisdom': wisdom,
+      'phyatk': phyatk,
+      'phydef': phydef,
+      'magatk': magatk,
+      'magdef': magdef,
+    };
+  }
 
   Future<void> _equipItem(Map<String, dynamic> item, String itemType) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     try {
-      // The item already contains a reference to the item in the collection
       final itemRef = item['ref'] as DocumentReference?;
       if (itemRef == null) {
         throw Exception('Item reference is missing');
@@ -563,8 +526,37 @@ class _ProfilePageState extends State<ProfilePage> {
         await _updateAvatarLayerWithSpritePath(itemType, itemId, spritePath);
       }
 
-      // Reload user data to reflect changes
-      await _loadUserData();
+      // Update battle stats in the database
+      await _updateBattleStats();
+
+      // Update local state for UI responsiveness
+      setState(() {
+        switch (itemType) {
+          case 'weapon':
+            equippedWeapon = item;
+            weaponInventory.removeWhere((i) => i['id'] == itemId);
+            break;
+          case 'armor':
+            equippedArmor = item;
+            armorInventory.removeWhere((i) => i['id'] == itemId);
+            break;
+          case 'cosmetic':
+            equippedCosmetic = item;
+            cosmeticInventory.removeWhere((i) => i['id'] == itemId);
+            break;
+        }
+      });
+
+      // Reload user data in the background to ensure complete synchronization
+      _loadUserData().then((_) {
+        // Only update UI if the widget is still mounted
+        if (mounted) {
+          setState(() {
+            // Update avatar layers after data reload
+            _updateAvatarLayers();
+          });
+        }
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${item['name']} equipped!')),
@@ -574,6 +566,157 @@ class _ProfilePageState extends State<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to equip item: $e')),
       );
+    }
+  }
+
+  Future<void> _unequipItem(String itemType) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      String equippedField;
+      String itemName;
+      String? itemId;
+      Map<String, dynamic>? itemToUnequip;
+
+      switch (itemType) {
+        case 'weapon':
+          equippedField = 'equippedWeapon';
+          itemToUnequip = equippedWeapon;
+          itemName = equippedWeapon?['name'] ?? 'Weapon';
+          itemId = equippedWeapon?['id'];
+          break;
+        case 'armor':
+          equippedField = 'equippedArmor';
+          itemToUnequip = equippedArmor;
+          itemName = equippedArmor?['name'] ?? 'Armor';
+          itemId = equippedArmor?['id'];
+          break;
+        case 'cosmetic':
+          equippedField = 'equippedCosmetic';
+          itemToUnequip = equippedCosmetic;
+          itemName = equippedCosmetic?['name'] ?? 'Cosmetic';
+          itemId = equippedCosmetic?['id'];
+          break;
+        default:
+          throw Exception('Invalid item type');
+      }
+
+      // If we have an item ID, clear its layer from the avatar
+      if (itemId != null) {
+        await _clearAvatarLayer(itemType, itemId);
+      }
+
+      // Use FieldValue.delete() to completely remove the field
+      await _firestore.collection('users').doc(userId).update({
+        equippedField: FieldValue.delete(),
+      });
+
+      // Immediately update local state for UI responsiveness
+      setState(() {
+        if (itemType == 'weapon') {
+          equippedWeapon = null;
+          weaponLayerSprite = null;
+        } else if (itemType == 'armor') {
+          equippedArmor = null;
+          armorLayerSprite = null;
+        } else if (itemType == 'cosmetic') {
+          equippedCosmetic = null;
+          cosmeticLayerSprite = null;
+        }
+      });
+
+      // Update battle stats in the database to remove the item's bonuses
+      await _updateBattleStats();
+
+      // Now reload user data and inventory to refresh everything
+      await _loadUserData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$itemName unequipped successfully!')),
+      );
+    } catch (e) {
+      print('Error unequipping item: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to unequip item: $e')),
+      );
+    }
+  }
+
+  Future<void> _addEquippedItemToInventory(Map<String, dynamic> item, String itemType) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      String inventoryDocName;
+      switch (itemType) {
+        case 'weapon':
+          inventoryDocName = 'weapons';
+          break;
+        case 'armor':
+          inventoryDocName = 'armor';
+          break;
+        case 'cosmetic':
+          inventoryDocName = 'cosmetics';
+          break;
+        default:
+          throw Exception('Invalid item type');
+      }
+
+      // Get a reference to the item
+      final itemRef = item['ref'] as DocumentReference?;
+      if (itemRef == null) {
+        throw Exception('Item reference is missing');
+      }
+
+      // Add the item reference to the appropriate inventory collection
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('inventory')
+          .doc(inventoryDocName)
+          .update({
+        'items': FieldValue.arrayUnion([itemRef]),
+      });
+
+    } catch (e) {
+      print('Error adding equipped item back to inventory: $e');
+    }
+  }
+
+  void _updateAvatarLayers() {
+    if (userAvatarLayers == null) return;
+
+    // Set base sprite
+    baseAvatarSprite = userAvatarLayers!.baseSprite;
+
+    // Reset layer sprites
+    weaponLayerSprite = null;
+    armorLayerSprite = null;
+    cosmeticLayerSprite = null;
+
+    // Check if weapon is equipped and if it has a matching layer
+    if (equippedWeapon != null) {
+      String weaponId = equippedWeapon!['id'];
+      if (userAvatarLayers!.weaponLayers.containsKey(weaponId)) {
+        weaponLayerSprite = userAvatarLayers!.weaponLayers[weaponId];
+      }
+    }
+
+    // Check if armor is equipped and if it has a matching layer
+    if (equippedArmor != null) {
+      String armorId = equippedArmor!['id'];
+      if (userAvatarLayers!.armorLayers.containsKey(armorId)) {
+        armorLayerSprite = userAvatarLayers!.armorLayers[armorId];
+      }
+    }
+
+    // Check if cosmetic is equipped and if it has a matching layer
+    if (equippedCosmetic != null) {
+      String cosmeticId = equippedCosmetic!['id'];
+      if (userAvatarLayers!.cosmeticLayers.containsKey(cosmeticId)) {
+        cosmeticLayerSprite = userAvatarLayers!.cosmeticLayers[cosmeticId];
+      }
     }
   }
 
@@ -616,74 +759,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _unequipItem(String itemType) async {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
-
-    try {
-      String equippedField;
-      String itemName;
-      String? itemId;
-
-      switch (itemType) {
-        case 'weapon':
-          equippedField = 'equippedWeapon';
-          itemName = equippedWeapon?['name'] ?? 'Weapon';
-          itemId = equippedWeapon?['id'];
-          break;
-        case 'armor':
-          equippedField = 'equippedArmor';
-          itemName = equippedArmor?['name'] ?? 'Armor';
-          itemId = equippedArmor?['id'];
-          break;
-        case 'cosmetic':
-          equippedField = 'equippedCosmetic';
-          itemName = equippedCosmetic?['name'] ?? 'Cosmetic';
-          itemId = equippedCosmetic?['id'];
-          break;
-        default:
-          throw Exception('Invalid item type');
-      }
-
-      // If we have an item ID, clear its layer from the avatar
-      if (itemId != null) {
-        await _clearAvatarLayer(itemType, itemId);
-      }
-
-      // Use FieldValue.delete() to completely remove the field
-      await _firestore.collection('users').doc(userId).update({
-        equippedField: FieldValue.delete(),
-      });
-
-      // Immediately update local state for UI responsiveness
-      setState(() {
-        if (itemType == 'weapon') {
-          equippedWeapon = null;
-          weaponLayerSprite = null;
-        } else if (itemType == 'armor') {
-          equippedArmor = null;
-          armorLayerSprite = null;
-        } else if (itemType == 'cosmetic') {
-          equippedCosmetic = null;
-          cosmeticLayerSprite = null;
-        }
-      });
-
-      // Now reload all data
-      await _loadUserData();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$itemName unequipped successfully!')),
-      );
-    } catch (e) {
-      print('Error unequipping item: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to unequip item: $e')),
-      );
-    }
-  }
-
-
+  // Update Avatar Sprite layers with the proper sprites
   Future<void> _updateAvatarLayerWithSpritePath(String itemType, String itemId, String spritePath) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null || userAvatarLayers == null) return;
@@ -719,50 +795,6 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       print('Error updating avatar layer with spritePath: $e');
     }
-  }
-
-
-
-  // Calculate total stats including equipment bonuses
-  Map<String, int> calculateTotalStats() {
-    // Base stats from the base stats document
-    int strength = baseStats?['strength'] ?? 10;
-    int intellect = baseStats?['intelligence'] ?? 10; // Note: Changed from 'intellect' to 'intelligence' to match your DB
-    int vitality = baseStats?['vitality'] ?? 10;
-    int wisdom = baseStats?['wisdom'] ?? 10;
-
-    // Combat stats from battle stats document
-    int phyatk = battleStats?['phyatk'] ?? 5;
-    int phydef = battleStats?['phydef'] ?? 5;
-    int magatk = battleStats?['magatk'] ?? 5;
-    int magdef = battleStats?['magdef'] ?? 5;
-
-    // Add weapon bonuses
-    if (equippedWeapon != null) {
-      phyatk += equippedWeapon?['phyatk'] as int? ?? 0;
-      phydef += equippedWeapon?['phydef'] as int? ?? 0;
-      magatk += equippedWeapon?['magatk'] as int? ?? 0;
-      magdef += equippedWeapon?['magdef'] as int? ?? 0;
-    }
-
-    // Add armor bonuses
-    if (equippedArmor != null) {
-      phyatk += equippedArmor?['phyatk'] as int? ?? 0;
-      phydef += equippedArmor?['phydef'] as int? ?? 0;
-      magatk += equippedArmor?['magatk'] as int? ?? 0;
-      magdef += equippedArmor?['magdef'] as int? ?? 0;
-    }
-
-    return {
-      'strength': strength,
-      'intellect': intellect,
-      'vitality': vitality,
-      'wisdom': wisdom,
-      'phyatk': phyatk,
-      'phydef': phydef,
-      'magatk': magatk,
-      'magdef': magdef,
-    };
   }
 
   @override
@@ -990,8 +1022,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-
-
   Widget _buildBottomPanel(ThemeData theme, Map<String, int> totalStats) {
     return Container(
       decoration: BoxDecoration(
@@ -1064,7 +1094,7 @@ class _ProfilePageState extends State<ProfilePage> {
             SizedBox(height: 8),
 
             _buildStatRow('STR', totalStats['strength']!, theme),
-            _buildStatRow('INT', totalStats['intellect']!, theme),
+            _buildStatRow('INT', totalStats['intelligence']!, theme),
             _buildStatRow('VIT', totalStats['vitality']!, theme),
             _buildStatRow('WIS', totalStats['wisdom']!, theme),
 
@@ -1645,7 +1675,6 @@ class _ProfilePageState extends State<ProfilePage> {
       print('Error adding sprite layer mapping for all users: $e');
     }
   }
-
 
   Color _getRarityColor(String rarity) {
     switch (rarity.toLowerCase()) {

@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'custom_widgets.dart';
 import 'game_mechanics.dart';
 
+// Handles enemy list display and selection
 class GamePage extends StatefulWidget {
   @override
   _GamePageState createState() => _GamePageState();
@@ -69,6 +70,7 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
+  // Loads enemies from database into list
   Future<void> _loadEnemies() async {
     try {
       // Get user level to filter appropriate enemies
@@ -91,12 +93,12 @@ class _GamePageState extends State<GamePage> {
         final enemyData = doc.data();
         enemyData['id'] = doc.id;
 
-        // Make sure we have the stats field properly loaded
+        // Make sure the stats field properly loads
         if (!enemyData.containsKey('stats')) {
           // If stats not directly in the document, try to retrieve them
           print('Loading stats for enemy: ${doc.id}');
 
-          // This ensures we always have a stats object, even if it's empty
+          // Ensures that theres always a stats object, even if it's empty
           enemyData['stats'] = {
             'phyatk': enemyData['phyatk'] ?? 5,
             'phydef': enemyData['phydef'] ?? 3,
@@ -305,7 +307,7 @@ class _GamePageState extends State<GamePage> {
           children: [
             Text('Are you ready to battle ${enemy['name']}?'),
             SizedBox(height: 16),
-            Text('Your Health: ${userData?['health'] ?? 100}/100'),
+            Text('Your Health: ${userData?['health'] ?? 100}/${userData?['maxHealth'] ?? 100}'),
             SizedBox(height: 8),
             enemy['isBoss'] == true
                 ? Text(
@@ -350,6 +352,7 @@ class _GamePageState extends State<GamePage> {
   }
 }
 
+// Handles battle logic
 class BattlePage extends StatefulWidget {
   final Map<String, dynamic> enemy;
   final Map<String, dynamic> userData;
@@ -400,7 +403,7 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
   bool battleEnded = false;
 
   // Mana regeneration
-  double playerManaRegenPerTurn = 0.1; // Amount of mana to regenerate per turn
+  double playerManaRegenPerTurn = 0.1; // Amount of mana to regenerate per turn (percentage)
 
   // Animation controllers
   late AnimationController _playerAttackController;
@@ -430,6 +433,7 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
   }
 
 
+  // Load user avatar
   Future<void> _loadAvatarLayers() async {
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -589,6 +593,7 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
   }
 
 
+  // Load player and enemy Skills
   Future<void> _loadSkills() async {
     setState(() {
       isLoadingSkills = true;
@@ -775,8 +780,9 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
 
 
 
+
   void _initBattleStats() {
-    // Initialize player stats (existing code)
+    // Initialize player stats
     playerHealth = widget.userData['health'] ?? 100;
     playerMaxHealth = widget.userData['maxHealth'] ?? 100;
     playerMana = widget.userData['mana'] ?? 50;
@@ -804,7 +810,7 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
       'magdef': playerMagDef,
     };
 
-    // Initialize enemy stats (existing code)
+    // Initialize enemy stats
     enemyHealth = widget.enemy['health'] ?? widget.enemy['maxHealth'] ?? 100;
     enemyMaxHealth = widget.enemy['maxHealth'] ?? 100;
     enemyMana = widget.enemy['mana'] ?? widget.enemy['maxMana'] ?? 30;
@@ -964,37 +970,6 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
       _enemyTurn();
     });
   }
-
-  void _useItem(String itemName, int healthRestored, int manaRestored) {
-    if (!playerTurn || battleEnded) return;
-
-    setState(() {
-      playerHealth = min(playerMaxHealth, playerHealth + healthRestored);
-      playerMana = min(playerMaxMana, playerMana + manaRestored);
-      _addToBattleLog("You used $itemName!");
-
-      if (healthRestored > 0) {
-        _addToBattleLog("Restored $healthRestored health!");
-      }
-
-      if (manaRestored > 0) {
-        _addToBattleLog("Restored $manaRestored mana!");
-      }
-
-      playerTurn = false;
-      currentAction = "Enemy's turn...";
-      currentSubMenu = "";
-    });
-
-    // Regenerate mana when using items
-    _regeneratePlayerMana();
-
-    // Enemy turn after a short delay
-    Future.delayed(Duration(milliseconds: 1000), () {
-      _enemyTurn();
-    });
-  }
-
 
 
   Future<void> _performDamageSkill(Skill skill) async {
@@ -1606,6 +1581,7 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
     );
   }
 
+  // Build battle screen
   Widget _buildBattleScene(ThemeData theme, Size screenSize) {
 
 
@@ -1798,6 +1774,7 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
     );
   }
 
+
   Widget _buildBottomSection(ThemeData theme) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1824,8 +1801,6 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
                   _buildMainActionMenu()
                 else if (currentSubMenu == "skills")
                   _buildSkillsMenu()
-                else if (currentSubMenu == "items")
-                    _buildItemsMenu(),
               ],
             ),
           ),
@@ -1844,50 +1819,38 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
 
   Widget _buildMainActionMenu() {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: playerTurn && !battleEnded ? _performBasicAttack : null,
-                child: Text('Attack'),
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: playerTurn && !battleEnded
-                    ? () => setState(() => currentSubMenu = "skills")
-                    : null,
-                child: Text('Skills'),
-              ),
-            ),
-          ],
+        // Attack button
+        ElevatedButton(
+          onPressed: playerTurn && !battleEnded
+              ? _performBasicAttack
+              : null,
+          child: Text('Attack'),
         ),
-        SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: playerTurn && !battleEnded
-                    ? () => setState(() => currentSubMenu = "items")
-                    : null,
-                child: Text('Items'),
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: playerTurn && !battleEnded
-                    ? _showRetreatConfirmation
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                ),
-                child: Text('Retreat'),
-              ),
-            ),
-          ],
+
+        SizedBox(height: 8), // Add spacing between buttons
+
+        // Skill button
+        ElevatedButton(
+          onPressed: playerTurn && !battleEnded
+              ? () => setState(() => currentSubMenu = "skills")
+              : null,
+          child: Text('Skills'),
+        ),
+
+        SizedBox(height: 8), // Add spacing between buttons
+
+        // Retreat button
+        ElevatedButton(
+          onPressed: playerTurn && !battleEnded
+              ? _showRetreatConfirmation
+              : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+          ),
+          child: Text('Retreat'),
         ),
       ],
     );
@@ -2127,47 +2090,10 @@ class _BattlePageState extends State<BattlePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildItemsMenu() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Items list - these would come from player inventory in a real implementation
-        ListTile(
-          title: Text('Health Potion'),
-          subtitle: Text('Restore 30 HP'),
-          onTap: playerTurn && !battleEnded
-              ? () => _useItem('Health Potion', 30, 0)
-              : null,
-          enabled: playerTurn && !battleEnded,
-        ),
-        ListTile(
-          title: Text('Mana Potion'),
-          subtitle: Text('Restore 20 MP'),
-          onTap: playerTurn && !battleEnded
-              ? () => _useItem('Mana Potion', 0, 20)
-              : null,
-          enabled: playerTurn && !battleEnded,
-        ),
-        ListTile(
-          title: Text('Elixir'),
-          subtitle: Text('Restore 15 HP and 15 MP'),
-          onTap: playerTurn && !battleEnded
-              ? () => _useItem('Elixir', 15, 15)
-              : null,
-          enabled: playerTurn && !battleEnded,
-        ),
-        ElevatedButton(
-          onPressed: () => setState(() => currentSubMenu = ""),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey,
-          ),
-          child: Text('Back'),
-        ),
-      ],
-    );
-  }
+
 }
 
+// Avatar Layer data model
 class AvatarLayers {
   final String baseSprite;
   final Map<String, String> weaponLayers;
@@ -2200,6 +2126,7 @@ class AvatarLayers {
   }
 }
 
+// Handles Player Sprite display
 class LayeredSprite extends StatelessWidget {
   final String baseLayer;
   final String? weaponLayer;

@@ -4,7 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'class_page.dart';
+import 'custom_widgets.dart';
+
 
 class SkillsPage extends StatefulWidget {
   @override
@@ -137,12 +138,13 @@ class _SkillsPageState extends State<SkillsPage> {
     }
   }
 
+  // Fallback function in case classname not found
   String _formatClassId(String classId) {
     // Handle common class ID patterns
     if (classId == 'def_class') return 'Adventurer';
     if (classId == 'war_class') return 'Warrior';
     if (classId == 'mag_class') return 'Mage';
-    if (classId == 'hun_class') return 'Hunter';
+    if (classId == 'hunt_class') return 'Hunter';
 
     // For other patterns, try to extract meaningful name
     if (classId.endsWith('_class')) {
@@ -185,7 +187,7 @@ class _SkillsPageState extends State<SkillsPage> {
 
         if (displayName == 'Warrior') displayToIdMap[displayName] = 'war_class';
         else if (displayName == 'Mage') displayToIdMap[displayName] = 'mag_class';
-        else if (displayName == 'Hunter') displayToIdMap[displayName] = 'hun_class';
+        else if (displayName == 'Hunter') displayToIdMap[displayName] = 'hunt_class';
         else {
           // Generate ID from display name as fallback
           String classId = displayName.toLowerCase().substring(0, 3) + '_class';
@@ -725,7 +727,7 @@ class _SkillsPageState extends State<SkillsPage> {
                 final isExpanded = expandedSkills.contains(skillId);
                 final isLearned = userLearnedSkills.contains(skillId);
 
-                return SkillCard(
+                return SkillInfoCard(
                   skill: skill,
                   isExpanded: isExpanded,
                   isLearned: isLearned,
@@ -740,255 +742,6 @@ class _SkillsPageState extends State<SkillsPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class SkillCard extends StatelessWidget {
-  final Map<String, dynamic> skill;
-  final bool isExpanded;
-  final bool isLearned;
-  final Map<String, Map<String, dynamic>> skillsMap;
-  final List<String> learnedSkills;
-  final Function onToggleExpand;
-  final Function onLearn;
-  final Function getSkillIcon;
-  final Function buildEffectsList;
-
-  const SkillCard({
-    Key? key,
-    required this.skill,
-    required this.isExpanded,
-    required this.isLearned,
-    required this.skillsMap,
-    required this.learnedSkills,
-    required this.onToggleExpand,
-    required this.onLearn,
-    required this.getSkillIcon,
-    required this.buildEffectsList,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final skillName = skill['name'] ?? 'Unknown Skill';
-    final skillType = skill['type'] ?? 'basic';
-    final skillDescription = skill['description'] ?? 'No description available.';
-    final spCost = skill['spCost'] ?? 1;
-
-    // Check prerequisites
-    bool prerequisitesMet = true;
-    List<String> missingPrereqs = [];
-
-    if (skill['prerequisites'] != null && skill['prerequisites'] is List) {
-      for (var prereq in skill['prerequisites']) {
-        String prereqId;
-
-        if (prereq is DocumentReference) {
-          prereqId = prereq.id;
-        } else if (prereq is String) {
-          final parts = prereq.split('/');
-          prereqId = parts.last;
-        } else {
-          continue;
-        }
-
-        if (!learnedSkills.contains(prereqId)) {
-          prerequisitesMet = false;
-          // Get prerequisite name
-          String prereqName = skillsMap[prereqId]?['name'] ?? 'Unknown Skill';
-          missingPrereqs.add(prereqName);
-        }
-      }
-    }
-
-    return Card(
-      elevation: 3,
-      margin: EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isLearned
-            ? BorderSide(color: Colors.green, width: 2)
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        onTap: () => onToggleExpand(),
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          children: [
-            // Card Header - Always Visible
-            Container(
-              height: 80,
-              child: Row(
-                children: [
-                  // Left side - Icon/Image
-                  AspectRatio(
-                    aspectRatio: 1,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          bottomLeft: Radius.circular(isExpanded ? 0 : 16),
-                        ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          getSkillIcon(skillType),
-                          color: Theme.of(context).primaryColor,
-                          size: 40,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Right side - Skill Name
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              skillName,
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (isLearned)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8.0),
-                              child: Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                                size: 24,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Expanded Content
-            if (isExpanded)
-              Container(
-                padding: EdgeInsets.all(16),
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Description
-                    Text(
-                      'Description:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      skillDescription,
-                      style: TextStyle(fontSize: 15),
-                    ),
-                    SizedBox(height: 16),
-
-                    // Effects
-                    Text(
-                      'Effects:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    ...buildEffectsList(),
-                    SizedBox(height: 16),
-
-                    // Missing Prerequisites
-                    if (!prerequisitesMet && missingPrereqs.isNotEmpty) ...[
-                      Text(
-                        'Missing Prerequisites:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.red,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      ...missingPrereqs.map((prereq) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4.0),
-                        child: Row(
-                          children: [
-                            Icon(Icons.cancel, color: Colors.red, size: 16),
-                            SizedBox(width: 4),
-                            Text(prereq),
-                          ],
-                        ),
-                      )).toList(),
-                      SizedBox(height: 16),
-                    ],
-
-                    // Learn Button
-                    Center(
-                      child: isLearned
-                          ? Container(
-                        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Learned',
-                          style: TextStyle(
-                            color: Colors.green[800],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      )
-                          : ElevatedButton(
-                        onPressed: prerequisitesMet ? () => onLearn() : null,
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Learn Skill'),
-                            SizedBox(width: 8),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.white24,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.star, size: 16),
-                                  SizedBox(width: 2),
-                                  Text('$spCost'),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

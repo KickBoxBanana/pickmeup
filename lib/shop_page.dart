@@ -94,7 +94,6 @@ class _ShopPageState extends State<ShopPage> {
         // Skip items with price of 0
         if (price == 0) continue;
 
-        final itemPath = 'collection/${category}/${doc.id}';
         // Check if user owns this item
         final bool isOwned = _isItemOwned(ownedItemPaths, doc.id, category);
 
@@ -250,8 +249,7 @@ class _ShopPageState extends State<ShopPage> {
             ),
           ),
 
-          // Replace your category toggle with this:
-          // Category toggle - centered
+          // Category toggle
           Container(
             margin: EdgeInsets.symmetric(vertical: 8),
             alignment: Alignment.center, // Changed to center alignment
@@ -268,8 +266,8 @@ class _ShopPageState extends State<ShopPage> {
                 unselectedLabelColor: Colors.grey,
                 indicatorWeight: 3,
                 indicatorSize: TabBarIndicatorSize.label,
-                tabAlignment: TabAlignment.center, // Changed to center alignment
-                padding: EdgeInsets.zero,          // Removed left padding
+                tabAlignment: TabAlignment.center,
+                padding: EdgeInsets.zero,
                 tabs: _categories.map((category) =>
                     Tab(
                       child: Padding(

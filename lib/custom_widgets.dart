@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -579,6 +580,7 @@ class EnemyCard extends StatelessWidget {
   }
 }
 
+// Displays Item Info
 class ItemCard extends StatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onPurchase;
@@ -779,6 +781,257 @@ class _ItemCardState extends State<ItemCard> {
   }
 }
 
+// Displays Skill Info (for skills page)
+class SkillInfoCard extends StatelessWidget {
+  final Map<String, dynamic> skill;
+  final bool isExpanded;
+  final bool isLearned;
+  final Map<String, Map<String, dynamic>> skillsMap;
+  final List<String> learnedSkills;
+  final Function onToggleExpand;
+  final Function onLearn;
+  final Function getSkillIcon;
+  final Function buildEffectsList;
+
+  const SkillInfoCard({
+    Key? key,
+    required this.skill,
+    required this.isExpanded,
+    required this.isLearned,
+    required this.skillsMap,
+    required this.learnedSkills,
+    required this.onToggleExpand,
+    required this.onLearn,
+    required this.getSkillIcon,
+    required this.buildEffectsList,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final skillName = skill['name'] ?? 'Unknown Skill';
+    final skillType = skill['type'] ?? 'basic';
+    final skillDescription = skill['description'] ?? 'No description available.';
+    final spCost = skill['spCost'] ?? 1;
+
+    // Check prerequisites
+    bool prerequisitesMet = true;
+    List<String> missingPrereqs = [];
+
+    if (skill['prerequisites'] != null && skill['prerequisites'] is List) {
+      for (var prereq in skill['prerequisites']) {
+        String prereqId;
+
+        if (prereq is DocumentReference) {
+          prereqId = prereq.id;
+        } else if (prereq is String) {
+          final parts = prereq.split('/');
+          prereqId = parts.last;
+        } else {
+          continue;
+        }
+
+        if (!learnedSkills.contains(prereqId)) {
+          prerequisitesMet = false;
+          // Get prerequisite name
+          String prereqName = skillsMap[prereqId]?['name'] ?? 'Unknown Skill';
+          missingPrereqs.add(prereqName);
+        }
+      }
+    }
+
+    return Card(
+      elevation: 3,
+      margin: EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isLearned
+            ? BorderSide(color: Colors.green, width: 2)
+            : BorderSide.none,
+      ),
+      child: InkWell(
+        onTap: () => onToggleExpand(),
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            // Card Header - Always Visible
+            Container(
+              height: 80,
+              child: Row(
+                children: [
+                  // Left side - Icon/Image
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          bottomLeft: Radius.circular(isExpanded ? 0 : 16),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          getSkillIcon(skillType),
+                          color: Theme.of(context).primaryColor,
+                          size: 40,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Right side - Skill Name
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              skillName,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isLearned)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              child: Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 24,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Expanded Content
+            if (isExpanded)
+              Container(
+                padding: EdgeInsets.all(16),
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Description
+                    Text(
+                      'Description:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      skillDescription,
+                      style: TextStyle(fontSize: 15),
+                    ),
+                    SizedBox(height: 16),
+
+                    // Effects
+                    Text(
+                      'Effects:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    ...buildEffectsList(),
+                    SizedBox(height: 16),
+
+                    // Missing Prerequisites
+                    if (!prerequisitesMet && missingPrereqs.isNotEmpty) ...[
+                      Text(
+                        'Missing Prerequisites:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.red,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      ...missingPrereqs.map((prereq) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4.0),
+                        child: Row(
+                          children: [
+                            Icon(Icons.cancel, color: Colors.red, size: 16),
+                            SizedBox(width: 4),
+                            Text(prereq),
+                          ],
+                        ),
+                      )).toList(),
+                      SizedBox(height: 16),
+                    ],
+
+                    // Learn Button
+                    Center(
+                      child: isLearned
+                          ? Container(
+                        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.green[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Learned',
+                          style: TextStyle(
+                            color: Colors.green[800],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                          : ElevatedButton(
+                        onPressed: prerequisitesMet ? () => onLearn() : null,
+                        style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Learn Skill'),
+                            SizedBox(width: 8),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.star, size: 16),
+                                  SizedBox(width: 2),
+                                  Text('$spCost'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Displays Skill Info (for battle)
 class SkillCard extends StatelessWidget {
   final Map<String, dynamic> skill; // Skill data from firestore
   final bool isLearned;
@@ -1027,3 +1280,241 @@ class RewardDialog extends StatelessWidget {
   }
 }
 
+// Displays Class Info
+class ClassCard extends StatelessWidget {
+  final Map<String, dynamic> classData;
+  final VoidCallback? onTap;
+  final int userLevel;
+  final List<String> userClasses;
+
+  const ClassCard({
+    Key? key,
+    required this.classData,
+    this.onTap,
+    required this.userLevel,
+    required this.userClasses,
+  }) : super(key: key);
+
+  bool get isOwned => userClasses.contains(classData['id']);
+  bool get canSelect => onTap != null;
+  bool get isBasic => classData['type'].toString().toLowerCase() == 'basic';
+  bool get isAdvanced => classData['type'].toString().toLowerCase() == 'advanced';
+  bool get hasLevelRequirement => userLevel < (classData['reqLevel'] ?? 1);
+
+  String get statusMessage {
+    if (isOwned) return 'Owned';
+    if (isBasic && userClasses.isNotEmpty) return 'Already have basic class';
+    if (hasLevelRequirement) return 'Need higher level';
+    if (isAdvanced && userLevel < 20) return 'Need level 20+';
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final skills = classData['skills'] as List? ?? [];
+
+    print('DEBUG: Building ClassCard for "${classData['className']}" with ${skills.length} skills');
+    if (skills.isNotEmpty) {
+      print('DEBUG: First skill for "${classData['className']}": ${_formatSkill(skills.first)}');
+    }
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Opacity(
+          opacity: canSelect ? 1.0 : 0.6,
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with class name and level requirement
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      classData['className'] ?? 'Unknown Class',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Req. Level: ${classData['reqLevel'] ?? 1}',
+                      style: TextStyle(
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Status label if applicable
+                if (statusMessage.isNotEmpty)
+                  Container(
+                    margin: EdgeInsets.only(top: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isOwned ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      statusMessage,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isOwned ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+
+                // Skill icons
+                if (skills.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
+                      children: [
+                        for (int i = 0; i < 3 && i < skills.length; i++)
+                          Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () {
+                                print('DEBUG: Skill tapped: ${_formatSkill(skills[i])}');
+                                // Show skill dialog
+                                _showSkillDialog(context, skills[i]);
+                              },
+                              child: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    _getSkillIcon(skills[i]),
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatSkill(dynamic skill) {
+    if (skill is Map) {
+      return '{name: ${skill['name']}, description: ${skill['description'] ?? 'No description'}}';
+    } else if (skill is String) {
+      return skill;
+    } else {
+      return skill.toString();
+    }
+  }
+
+  IconData _getSkillIcon(dynamic skill) {
+    // This would ideally be mapped to specific skill icons
+    // For now using placeholder icons
+    final icons = [
+      Icons.flash_on,
+      Icons.security,
+      Icons.sports_kabaddi,
+      Icons.local_fire_department,
+      Icons.bolt,
+      Icons.add_moderator,
+    ];
+
+    // Generate a consistent index based on the skill name or ID
+    int index = 0;
+    print('DEBUG: Skill type: ${skill.runtimeType}');
+
+    if (skill is Map<String, dynamic>) {
+      final name = skill['name'] as String? ?? '';
+      print('DEBUG: Getting icon for skill map: $name');
+      index = name.isNotEmpty ? name.codeUnitAt(0) % icons.length : 0;
+    } else if (skill is String) {
+      print('DEBUG: Getting icon for skill string: $skill');
+      index = skill.isNotEmpty ? skill.codeUnitAt(0) % icons.length : 0;
+    } else if (skill is DocumentReference) {
+      // Handle DocumentReference case
+      print('DEBUG: Skill is a DocumentReference: ${skill.id}');
+      final id = skill.id;
+      index = id.isNotEmpty ? id.codeUnitAt(0) % icons.length : 0;
+    } else {
+      print('DEBUG: Unexpected skill type: ${skill.runtimeType}, value: $skill');
+    }
+
+    return icons[index];
+  }
+
+  void _showSkillDialog(BuildContext context, dynamic skill) async {
+    String skillName = 'Unknown Skill';
+    String skillDescription = 'No description available.';
+
+    print('DEBUG: Showing skill dialog. Skill type: ${skill.runtimeType}');
+    print('DEBUG: Skill raw value: $skill');
+
+    if (skill is Map<String, dynamic>) {
+      skillName = skill['name'] as String? ?? 'Unknown Skill';
+      skillDescription = skill['description'] as String? ?? 'No description available.';
+      print('DEBUG: Showing skill dialog for map: $skillName');
+    } else if (skill is String) {
+      skillName = skill;
+      print('DEBUG: Showing skill dialog for string skill: $skillName');
+    } else if (skill is DocumentReference) {
+      // Handle skill reference by fetching the actual skill data
+      print('DEBUG: Fetching skill data from reference: ${skill.id}');
+      try {
+        final skillDoc = await skill.get();
+        if (skillDoc.exists) {
+          final skillData = skillDoc.data() as Map<String, dynamic>?;
+          if (skillData != null) {
+            skillName = skillData['name'] as String? ?? 'Unknown Skill';
+            skillDescription = skillData['description'] as String? ?? 'No description available.';
+            print('DEBUG: Successfully fetched skill: $skillName');
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Error fetching skill data: $e');
+      }
+    }
+
+    // Only show dialog if context is still valid
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(skillName),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(skillDescription),
+              SizedBox(height: 8),
+              Text('Debug info:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Type: ${skill.runtimeType}', style: TextStyle(fontSize: 12)),
+              if (skill is DocumentReference)
+                Text('Reference: ${skill.path}', style: TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+}

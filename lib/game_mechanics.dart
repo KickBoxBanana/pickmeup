@@ -247,9 +247,9 @@ class LevelManager {
   // Creates an exponential curve where each level requires more XP
   static int getRequiredXpForLevel(int level) {
     // Base XP for level 1
-    const int baseXp = 100;
+    const int baseXp = 20;
     // Growth factor (higher = steeper XP curve)
-    const double growthFactor = 1.2;
+    const double growthFactor = 1.3;
 
     return (baseXp * pow(growthFactor, level - 1)).floor();
   }

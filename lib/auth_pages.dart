@@ -68,6 +68,7 @@ class AuthService {
         'mana': 30,
         'maxMana': 30,
         'xp': 0,
+        'skillPoints': 2,
         'class': _firestore.collection('classes').doc('def_class'), // Default class
         'emailVerified': false, // Track verification status
       });

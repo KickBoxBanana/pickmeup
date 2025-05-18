@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
 
+// Handles account related Firebase operations
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -47,16 +47,13 @@ class FirebaseService {
       'class': _firestore.collection('classes').doc('def_class'),
       'gems': 0,
       'gold': 0,
-      'health': 100,
-      'mana': 50,
+      'health': 25,
+      'maxHealth': 25,
+      'mana': 30,
+      'maxMana': 30,
       'userLevel': 1,
-      'skills': {
-        'skill1': _firestore.collection('skills').doc('yAcWu8PcE5BTHSYwj3xw'),
-        'skill2': _firestore.collection('skills').doc('i1esz97fcNqCKLzZE6Ao')
-      },
       'xp': 0,
-      'maxHealth': 100,
-      'maxMana': 50,
+      'skills': FieldValue.delete()
     });
 
     // Remove lastBattleTimestamp field if it exists
@@ -113,16 +110,14 @@ class FirebaseService {
 
     // Set battle stats
     await _firestore.collection('users/$userId/stats').doc('battle').set({
-      'phyatk': 10,
-      'phydef': 10,
-      'magatk': 10,
-      'magdef': 10,
+      'phyatk': 5,
+      'phydef': 5,
+      'magatk': 5,
+      'magdef': 5,
     });
   }
 
   // Send email verification
-  // Add this method to your FirebaseService class
-  // Add this method to your FirebaseService class
   Future<void> sendEmailVerification() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
